@@ -6,29 +6,32 @@ import be.hogent.tarsos.dsp.AudioEvent;
 import be.hogent.tarsos.dsp.AudioProcessor;
 
 public class BinarySignalProcessor implements AudioProcessor {
-	int windowPartitions = 10;
+	int windowPartitions = 1;
 	
 	long lastChangeFrame = 0;
 	boolean lastStatus = false;
-	double threshold = 0.0002;
+	double threshold = 0.4;
 	
 	@Override
 	public boolean process(AudioEvent audioEvent) {
 		int sampleRate = (int) audioEvent.getSampleRate();
-		int framesPerWindow = audioEvent.getBufferSize() / windowPartitions;
+		
+		int bufferSize = audioEvent.getFloatBuffer().length;
+		int framesPerWindow = bufferSize / windowPartitions;
 		
 		long frameIndex;
-		double rms;
+		double max;
 		
-		for (int frameDelta = 0; frameDelta < audioEvent.getBufferSize(); frameDelta += framesPerWindow) {
-			float[] frameBuffer = Arrays.copyOfRange(audioEvent.getFloatBuffer(), frameDelta, Math.min(frameDelta + framesPerWindow, audioEvent.getBufferSize()));
+		for (int frameDelta = 0; frameDelta < bufferSize; frameDelta = framesPerWindow + frameDelta) {
+			float[] frameBuffer = Arrays.copyOfRange(audioEvent.getFloatBuffer(), frameDelta, Math.min(frameDelta + framesPerWindow, bufferSize));
 			
-			rms = AudioEvent.calculateRMS(frameBuffer);
-			
-			
-			// rms > threshold means we hat a signal
+			max = maxValue(frameBuffer);
+
+			// max > threshold means we hat a signal
 			frameIndex = audioEvent.getSamplesProcessed() + frameDelta;
-			if (rms > threshold) {
+			
+			//System.out.println((1000*frameIndex/sampleRate) + " ms ## " + rms + " ## " + Math.abs(rms - threshold) + " (" + frameBuffer.length + ")");
+			if (max > threshold) {
 				if (!lastStatus) {
 					notifyChange(frameIndex, true, frameIndex - lastChangeFrame, sampleRate);
 					lastStatus = true;
@@ -41,8 +44,6 @@ public class BinarySignalProcessor implements AudioProcessor {
 					lastChangeFrame = frameIndex;
 				}
 			}
-
-			//System.out.println((1000*frameIndex/sampleRate) + " ms ## " + rms + " ## " + Math.abs(rms - threshold) + " (" + frameBuffer.length + ")");
 		}
 		
 		//System.out.println("Sample Rate: " + sampleRate + " Position: " + (Math.round(audioEvent.getTimeStamp()*100.0)/100.0) + " sec (" + audioEvent.getSamplesProcessed() + " frames processed)");
@@ -68,5 +69,14 @@ public class BinarySignalProcessor implements AudioProcessor {
 			System.out.println("DOWN  @" + frameIndex + "frames / " + (1000*frameIndex/sampleRate) + "ms since " + framesSinceLastChange + " frames.");
 		}
 	}
-
+	
+	private static float maxValue(float[] floats) {
+		float max = floats[0];
+		for (int i = 0; i < floats.length; i++) {
+			if (floats[i] > max) {
+				max = floats[i];
+			}
+		}
+		return max;
+	}
 }

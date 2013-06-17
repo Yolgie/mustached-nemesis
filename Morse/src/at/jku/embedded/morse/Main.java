@@ -22,12 +22,12 @@ public class Main {
 		File audioFile = new File("../sos.wav");
 		
 		try {
-			AudioDispatcher dispatcher = AudioDispatcher.fromFile(audioFile, 4410, 0);
+			AudioDispatcher dispatcher = AudioDispatcher.fromFile(audioFile, 441, 0);
 
 			final long frames = dispatcher.durationInFrames();
 			System.out.println(frames);
 			
-			dispatcher.addAudioProcessor(new BandPass(2000, 100, 44100));
+			//dispatcher.addAudioProcessor(new BandPass(2000, 100, 44100));
 			
 			dispatcher.addAudioProcessor(new BinarySignalProcessor());
 			
