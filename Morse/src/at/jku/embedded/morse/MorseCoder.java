@@ -6,9 +6,22 @@ import java.io.Writer;
 
 
 public class MorseCoder {
-
-	private static final String TREE = "#ETIANMSURWDKGOHVFULÄPJBXCYZQÖ+54#3###2#######16#######7###8#90";
+	
+	private static final String TREE = "#ETIANMSURWDKGOHVFULÄPJBXCYZQÖ#54#3###2#######16#######7###8#90";
 	private static final char[] TREE_ARRAY = TREE.toCharArray();
+	
+	public static String getAllowedCharacters() {
+		StringBuilder b = new StringBuilder();
+		b.append(" ");
+		for (int i = 0; i < TREE_ARRAY.length; i++) {
+			char c = TREE_ARRAY[i];
+			if (c != '#') {
+				b.append(c);
+			}
+		}
+		return b.toString();
+	}
+	
 	
 	private static final int MAX_TREE_DEPTH = 5;
 	
