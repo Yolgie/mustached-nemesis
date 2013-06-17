@@ -2,7 +2,6 @@ package at.jku.embedded.morse.audio;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -52,10 +51,20 @@ public class AudioIn {
 		return active;
 	}
 
+	private boolean up;
+	
 	private void processImpl(AudioDispatcher dispatcher) {
 		final long frames = dispatcher.durationInFrames();
 		System.out.println(frames);
 
+		dispatcher.addAudioProcessor(new BinarySignalProcessor() {
+			@Override
+			protected void notifyChange(long frameIndex, boolean up,
+					long framesSinceLastChange, int sampleRate) {
+				notifyChangeImpl(sampleRate, frameIndex, framesSinceLastChange, up);
+			}
+		});
+		
 		dispatcher.addAudioProcessor(new AudioProcessor() {
 			@Override
 			public void processingFinished() {
@@ -65,22 +74,7 @@ public class AudioIn {
 			@Override
 			public boolean process(AudioEvent audioEvent) {
 				int bitRate = (int)audioEvent.getSampleRate();
-				
-				boolean[] upOrDown = new boolean[audioEvent.getFloatBuffer().length];
-				
-				notifySignalProcessed(bitRate, audioEvent.getFloatBuffer(), upOrDown);
-				
-				int dit = (bitRate / 1000) * ditLength;
-				long frameIndex = audioEvent.getSamplesProcessed() - 6 * dit;
-				
-				Arrays.fill(upOrDown, 0, audioEvent.getFloatBuffer().length / 2, true);
-				
-				notifyChange(bitRate, (frameIndex += dit), dit, true);
-				notifyChange(bitRate, (frameIndex += dit), dit, false);
-				
-				notifyChange(bitRate, (frameIndex += dit * 3), dit * 3, true);
-				notifyChange(bitRate, (frameIndex += dit), dit, false);
-				
+				notifySignalProcessed(bitRate, audioEvent.getFloatBuffer(), up);
 				return !active.isCancelled();
 			}
 		});
@@ -111,9 +105,9 @@ public class AudioIn {
 		}
 	}
 	
-	protected void notifyChange(int bitrate, long frameIndex, long durationFrames, boolean value) {
+	protected void notifyChangeImpl(int bitrate, long frameIndex, long durationFrames, boolean value) {
 		long durationMs = durationFrames / (bitrate / 1000);
-		
+		this.up = value;
 		double dits = durationMs / (double)ditLength;
 		if (!value) {
 			// downwards
@@ -149,7 +143,7 @@ public class AudioIn {
 			boolean value) {
 	}
 
-	protected void notifySignalProcessed(int bitRate, float[] points, boolean[] upOrDown) {
+	protected void notifySignalProcessed(int bitRate, float[] points, boolean upOrDown) {
 
 	}
 	

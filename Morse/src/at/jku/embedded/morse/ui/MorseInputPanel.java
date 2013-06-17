@@ -15,8 +15,6 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.swing.JButton;
@@ -67,7 +65,7 @@ public class MorseInputPanel extends JPanel {
 			});
 		};
 		
-		protected void notifySignalProcessed(final int bitrate, final float[] points, final boolean[] upOrDown) {
+		protected void notifySignalProcessed(final int bitrate, final float[] points, final boolean upOrDown) {
 			EventQueue.invokeLater(new Runnable() {
 				@Override
 				public void run() {
@@ -85,8 +83,8 @@ public class MorseInputPanel extends JPanel {
 			});
 		}
 		
-		protected void notifyChange(int bitrate, long frameIndex, long durationFrames, final boolean value) {
-			super.notifyChange(bitrate, frameIndex, durationFrames, value);
+		protected void notifyChangeImpl(int bitrate, long frameIndex, long durationFrames, final boolean value) {
+			super.notifyChangeImpl(bitrate, frameIndex, durationFrames, value);
 			EventQueue.invokeLater(new Runnable() {
 				@Override
 				public void run() {
@@ -170,7 +168,6 @@ public class MorseInputPanel extends JPanel {
 			b.append(morse);
 		}
 		rightTextArea.setText(b.toString());
-		
 		
 		StringWriter writer = new StringWriter();
 		try {
@@ -270,7 +267,6 @@ public class MorseInputPanel extends JPanel {
 		speedTextField.setEnabled(!playing);
 	}
 	
-	private boolean cur;
 	private final JButton btnLoad = new JButton("Load");
 	
 	
@@ -279,7 +275,7 @@ public class MorseInputPanel extends JPanel {
 	private int width = 500;
 	private int resolution = 5; // ms
 	
-	private void notifySignal(int bitrate, float[] points, boolean[] upOrDown) {
+	private void notifySignal(int bitrate, float[] points, boolean upOrDown) {
 		int msZoom = resolution;
 		int zoom = (bitrate / 1000) * msZoom;
 		
@@ -291,7 +287,7 @@ public class MorseInputPanel extends JPanel {
 				double time = (index / (double)bitrate);
 				
 				traceReal.addPoint(time, (float)(max));
-				traceParsed.addPoint(time, upOrDown[i] ? 1.0 : 0.0);
+				traceParsed.addPoint(time, upOrDown ? 1.0 : 0.0);
 				
 				max = 0.0f;
 			}
@@ -305,7 +301,6 @@ public class MorseInputPanel extends JPanel {
 //		rightTextArea.setSelectionStart(symbolIndex);
 //		rightTextArea.setSelectionEnd(symbolIndex + 1);
 		
-		cur = value;
 	}
 	
 	private void initialize() {
