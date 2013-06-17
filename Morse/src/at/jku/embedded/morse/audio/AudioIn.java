@@ -9,10 +9,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.DataLine;
-import javax.sound.sampled.LineEvent;
-import javax.sound.sampled.LineListener;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.TargetDataLine;
 import javax.sound.sampled.UnsupportedAudioFileException;
@@ -20,14 +18,20 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 import be.hogent.tarsos.dsp.AudioDispatcher;
 import be.hogent.tarsos.dsp.AudioEvent;
 import be.hogent.tarsos.dsp.AudioProcessor;
-import be.hogent.tarsos.dsp.filters.HighPass;
 
 public class AudioIn {
 
 	private ExecutorService exec = Executors.newScheduledThreadPool(1);
 
+	public static final int BITRATE = 44100;
+	
+	public static final int FRAME_BUFFER = 1024;
+	public static final int FRAME_OVERLAP = 0;
+	
 	private int ditLength = 50;
 
+	private Future<?> active;
+	
 	public int getDitLength() {
 		return ditLength;
 	}
@@ -36,23 +40,15 @@ public class AudioIn {
 		this.ditLength = ditLength;
 	}
 
-	public Future<?> load(File file) {
-		try {
-			return process(AudioDispatcher.fromFile(file, 1000, 0));
-		} catch (UnsupportedAudioFileException | IOException e) {
-			e.printStackTrace();
-			return null;
-		}
-	}
-
 	private Future<?> process(final AudioDispatcher dispatcher) {
-		return exec.submit(new Callable<Void>() {
+		active = exec.submit(new Callable<Void>() {
 			@Override
 			public Void call() throws Exception {
 				processImpl(dispatcher);
 				return null;
 			}
 		});
+		return active;
 	}
 
 	private void processImpl(AudioDispatcher dispatcher) {
@@ -64,22 +60,34 @@ public class AudioIn {
 			public void processingFinished() {
 			}
 
-			float frame;
-
 			@Override
 			public boolean process(AudioEvent audioEvent) {
-				int sampleRate = (int) audioEvent.getSampleRate();
-				System.out.println(Arrays.toString(audioEvent.getFloatBuffer()));
-
-				notifySignalProcessed(audioEvent.getFloatBuffer());
-				return true;
+				int bitRate = (int)audioEvent.getSampleRate();
+				notifySignalProcessed(bitRate, audioEvent.getFloatBuffer());
+				return !active.isCancelled();
 			}
 		});
+		dispatcher.run();
+		notifyDone();
 	}
 
+	public Future<?> load(File file) {
+		try {
+			return process(AudioDispatcher.fromFile(file, FRAME_BUFFER, FRAME_OVERLAP));
+		} catch (UnsupportedAudioFileException | IOException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
 	public Future<?> record() {
 		try {
-			return process(AudioDispatcher.fromDefaultMicrophone(1000, 0));
+			final AudioFormat format = new AudioFormat(BITRATE, 16, 1, true,true);
+			TargetDataLine line =  AudioSystem.getTargetDataLine(format);
+			line.open(format, FRAME_BUFFER);
+			line.start();
+			AudioInputStream stream = new AudioInputStream(line);
+			return process(new AudioDispatcher(stream, FRAME_BUFFER, FRAME_OVERLAP));
 		} catch (UnsupportedAudioFileException | LineUnavailableException e) {
 			e.printStackTrace();
 			return null;
@@ -88,54 +96,12 @@ public class AudioIn {
 
 	protected void notifyDitReceived(int ditIndex, int symbolIndex,
 			boolean value) {
-
 	}
 
-	protected void notifySignalProcessed(float[] points) {
+	protected void notifySignalProcessed(int bitRate, float[] points) {
 
 	}
-
-	public static void main(String[] args) {
-		AudioFormat format = new AudioFormat(16000, 16, 1, true, true);
-		TargetDataLine line;
-		DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
-		if (!AudioSystem.isLineSupported(info)) {
-			// Handle the error ...
-
-		}
-		// Obtain and open the line.
-		try {
-			line = (TargetDataLine) AudioSystem.getLine(info);
-			line.open(format);
-
-			line.addLineListener(new LineListener() {
-
-				@Override
-				public void update(LineEvent event) {
-					System.out.println(event);
-				}
-			});
-
-			line.start();
-
-			Thread.sleep(1000);
-
-			line.stop();
-
-			int available = line.available();
-			byte[] buffer = new byte[available];
-			line.read(buffer, 0, available);
-
-			System.out.println(Arrays.toString(buffer));
-
-		} catch (LineUnavailableException ex) {
-			// Handle the error ...
-			ex.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
+	
+	protected void notifyDone() {
 	}
-
 }

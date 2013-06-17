@@ -64,14 +64,23 @@ public class MorseInputPanel extends JPanel {
 			});
 		};
 		
-		protected void notifySignalProcessed(final float[] points) {
+		protected void notifySignalProcessed(final int bitrate, final float[] points) {
 			EventQueue.invokeLater(new Runnable() {
 				@Override
 				public void run() {
-					notifySignal(points);
+					notifySignal(bitrate, points);
 				}
 			});
 		};
+		
+		protected void notifyDone() {
+			EventQueue.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					stop();
+				}
+			});
+		}
 		
 	};
 	
@@ -110,7 +119,7 @@ public class MorseInputPanel extends JPanel {
 		recordButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				start();
+				record();
 			}
 		});
 		
@@ -140,7 +149,7 @@ public class MorseInputPanel extends JPanel {
 			File selectedFile = chooser.getSelectedFile();
 			if (selectedFile != null) {
 				start();
-				audioIn.load(selectedFile);
+				running = audioIn.load(selectedFile);
 			}
 		}
 	}
@@ -154,44 +163,49 @@ public class MorseInputPanel extends JPanel {
 	}
 	
 
-	private Future<?> playing;
+	private Future<?> running;
 	private final Chart2D chart = new Chart2D();
 	   
 	private ITrace2D traceReal;
-	private ITrace2D traceParsed;
+//	private ITrace2D traceParsed;
 
+	
+	private void record() {
+		start();
+		running = audioIn.record();
+	}
+	
 	private void start() {
-		if (playing != null) {
+		if (running != null) {
 			return;
 		}
 		setPlaying(true);
 		
 		if (traceReal != null) {
 			chart.removeTrace(traceReal);
-			chart.removeTrace(traceParsed);
+//			chart.removeTrace(traceParsed);
 		}
 		
-		traceReal = new Trace2DLtd(3000);
+		traceReal = new Trace2DLtd(maxpoints);
 		traceReal.setColor(Color.BLUE);
 		traceReal.setPhysicalUnits("Dit", "Value");
 		traceReal.setStroke(new BasicStroke(0.05f));
 		
-		traceParsed = new Trace2DLtd(100);
-		traceParsed.setColor(Color.RED);
-		traceParsed.setPhysicalUnits("Dit", "Value");
+//		traceParsed = new Trace2DLtd(100);
+//		traceParsed.setColor(Color.RED);
+//		traceParsed.setPhysicalUnits("Dit", "Value");
 		
 		chart.addTrace(traceReal);
-		chart.addTrace(traceParsed);
-		
-		playing = audioIn.record();
+//		chart.addTrace(traceParsed);
 	}  
 	
 	private void stop() {
-		if (playing != null) {
-			playing.cancel(false);
+		if (running != null) {
+			running.cancel(false);
 			setPlaying(false);
 			
-			playing = null;
+			running = null;
+			index = 0;
 		}
 	}
 	
@@ -216,9 +230,20 @@ public class MorseInputPanel extends JPanel {
 	
 	
 	int index = 0;
-	private void notifySignal(float[] points) {
-		for (float f : points) {
-			traceReal.addPoint(index, f);
+
+	private int maxpoints = 1024;
+	private void notifySignal(int bitrate, float[] points) {
+		int zoom = 64;
+		
+		double max = 0.0f;
+		
+		for (int i = 0; i < points.length; i++) {
+			max = Math.max(max, Math.abs(points[i]));
+			
+			if (this.index % zoom == 0) {
+				traceReal.addPoint(index - (zoom / 2), (float)(max));
+				max = 0.0f;
+			}
 			index++;
 		}
 	}
@@ -231,10 +256,10 @@ public class MorseInputPanel extends JPanel {
 		rightTextArea.setSelectionStart(symbolIndex);
 		rightTextArea.setSelectionEnd(symbolIndex + 1);
 		
-		if (prev != value) {
-			traceParsed.addPoint(ditIndex, prev ? 1 : 0);
-		}
-		traceParsed.addPoint(ditIndex, value ? 1 : 0);
+//		if (prev != value) {
+//			traceParsed.addPoint(ditIndex, prev ? 1 : 0);
+//		}
+//		traceParsed.addPoint(ditIndex, value ? 1 : 0);
 		
 		this.prev = value;
 	}

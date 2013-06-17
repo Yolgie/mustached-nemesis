@@ -18,7 +18,6 @@ public class AudioOut {
 	private ExecutorService exec = Executors.newScheduledThreadPool(1);
 
 	private int ditLength = 50; // ms
-	private final int sampleRate = 16000;
 	
 	private Future<?> active;
 	
@@ -45,7 +44,7 @@ public class AudioOut {
 	}
 	
 	private void playAsync(MorseCode out) throws LineUnavailableException {
-		AudioFormat format = new AudioFormat(sampleRate, 16, 1, true, true);
+		AudioFormat format = new AudioFormat(AudioIn.BITRATE, 16, 1, true, true);
 		SourceDataLine line = AudioSystem.getSourceDataLine(format);
 		line.open(format, 4096); // open line with 4 KB buffer
 		
@@ -55,18 +54,17 @@ public class AudioOut {
 			
 			switch (morse) {
 			case DASH:
-				play(ditIndex++, index, line, true);
-				play(ditIndex++, index, line, true);
-				play(ditIndex++, index, line, true);
-				play(ditIndex++, index, line, false);
+				play(ditIndex, 3, index, line, true);
+				ditIndex = ditIndex + 3;
+				play(ditIndex++, 1, index, line, false);
 				break;
 			case DOT:
-				play(ditIndex++, index, line, true);
-				play(ditIndex++, index, line, false);
+				play(ditIndex++, 1, index, line, true);
+				play(ditIndex++, 1, index, line, false);
 				break;
 			case GAP:
-				play(ditIndex++, index, line, false);
-				play(ditIndex++, index, line, false);
+				play(ditIndex, 2, index, line, false);
+				ditIndex = ditIndex + 2;
 				break;
 			case END:
 				break;
@@ -94,10 +92,12 @@ public class AudioOut {
 		
 	}
 	
-	private void play(int ditIndex, int symbolIndex, SourceDataLine line, boolean enabled) {
-		notifyPlayingIndex(symbolIndex, ditIndex, enabled);
+	private void play(int ditIndex, int length, int symbolIndex, SourceDataLine line, boolean enabled) {
+		for (int i = 0; i < length; i++) {
+			notifyPlayingIndex(symbolIndex, ditIndex + i, enabled);
+		}
 		
-		int ditLength = (sampleRate / 1000) * this.ditLength;
+		int ditLength = (AudioIn.BITRATE / 1000) * this.ditLength * length;
 		
 		for (int i = 0; i < ditLength; i++) { // play 1 sec tone (16000 samples)
 			// start to play when buffer is 3/4 filled (avoids buffer
@@ -107,7 +107,7 @@ public class AudioOut {
 			// v(i) = sin( 2 * pi * frequency * i/sampleRate ) * amplitude
 			short v = 0;
 			if (enabled) {
-				v = (short) (Math.sin(2 * Math.PI * 2000 * i / 16000) * (Short.MAX_VALUE));
+				v = (short) (Math.sin(2 * Math.PI * 2000 * i / AudioIn.BITRATE) * (Short.MAX_VALUE));
 			}
 			// write short v in big endian format to line. blocks if buffer
 			// full
