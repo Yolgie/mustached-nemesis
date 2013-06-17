@@ -8,19 +8,20 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.EventQueue;
 import java.awt.GridLayout;
-import java.awt.Stroke;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -33,7 +34,9 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import net.miginfocom.swing.MigLayout;
+import at.jku.embedded.morse.Morse;
 import at.jku.embedded.morse.MorseCoder;
+import at.jku.embedded.morse.MorseIn;
 import at.jku.embedded.morse.audio.AudioIn;
 
 public class MorseInputPanel extends JPanel {
@@ -64,11 +67,11 @@ public class MorseInputPanel extends JPanel {
 			});
 		};
 		
-		protected void notifySignalProcessed(final int bitrate, final float[] points) {
+		protected void notifySignalProcessed(final int bitrate, final float[] points, final boolean[] upOrDown) {
 			EventQueue.invokeLater(new Runnable() {
 				@Override
 				public void run() {
-					notifySignal(bitrate, points);
+					notifySignal(bitrate, points, upOrDown);
 				}
 			});
 		};
@@ -82,7 +85,28 @@ public class MorseInputPanel extends JPanel {
 			});
 		}
 		
+		protected void notifyChange(int bitrate, long frameIndex, long durationFrames, final boolean value) {
+			super.notifyChange(bitrate, frameIndex, durationFrames, value);
+			EventQueue.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					notifyRecordDit(0, 0, value);
+				}
+			});
+		}
+		
+		protected void notifyMorseAdded(final Morse morse) {
+			EventQueue.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					morseCode.add(morse);
+					updateMorse();
+				}
+			});
+		}
 	};
+	
+	private final List<Morse> morseCode = new ArrayList<>();
 	
 	/**
 	 * Create the panel.
@@ -94,7 +118,7 @@ public class MorseInputPanel extends JPanel {
 		speedTextField.setText(String.valueOf(audioIn.getDitLength()));
 		chart.setBorder(UIManager.getBorder("ScrollPane.border"));
 		
-		contentPanel.add(chart, "cell 0 1 8 1,grow");
+		contentPanel.add(chart, "cell 0 1 7 1,grow");
 		setPlaying(false);
 	}
 	
@@ -134,9 +158,28 @@ public class MorseInputPanel extends JPanel {
 				load();
 			}
 		});
+
 	}
 	
 	private File lastDir;
+	
+	private void updateMorse() {
+		MorseCoder coder = new MorseCoder();
+		StringBuilder b = new StringBuilder();
+		for (Morse morse : morseCode) {
+			b.append(morse);
+		}
+		rightTextArea.setText(b.toString());
+		
+		
+		StringWriter writer = new StringWriter();
+		try {
+			coder.decodeText(new MorseIn(b.toString()), writer);
+			leftTextArea.setText(writer.getBuffer().toString());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 	
 	private void load() {
 		if (lastDir == null) {
@@ -167,7 +210,7 @@ public class MorseInputPanel extends JPanel {
 	private final Chart2D chart = new Chart2D();
 	   
 	private ITrace2D traceReal;
-//	private ITrace2D traceParsed;
+	private ITrace2D traceParsed;
 
 	
 	private void record() {
@@ -181,22 +224,25 @@ public class MorseInputPanel extends JPanel {
 		}
 		setPlaying(true);
 		
+		morseCode.clear();
+		
 		if (traceReal != null) {
 			chart.removeTrace(traceReal);
-//			chart.removeTrace(traceParsed);
+			chart.removeTrace(traceParsed);
 		}
 		
-		traceReal = new Trace2DLtd(maxpoints);
+		traceReal = new Trace2DLtd(width);
 		traceReal.setColor(Color.BLUE);
 		traceReal.setPhysicalUnits("Dit", "Value");
 		traceReal.setStroke(new BasicStroke(0.05f));
 		
-//		traceParsed = new Trace2DLtd(100);
-//		traceParsed.setColor(Color.RED);
-//		traceParsed.setPhysicalUnits("Dit", "Value");
+		traceParsed = new Trace2DLtd(width);
+		traceParsed.setColor(Color.RED);
+		traceParsed.setPhysicalUnits("Dit", "Value");
 		
+		
+		chart.addTrace(traceParsed);
 		chart.addTrace(traceReal);
-//		chart.addTrace(traceParsed);
 	}  
 	
 	private void stop() {
@@ -224,24 +270,29 @@ public class MorseInputPanel extends JPanel {
 		speedTextField.setEnabled(!playing);
 	}
 	
-	private boolean prev;
-	private final JButton btnReset = new JButton("Reset");
+	private boolean cur;
 	private final JButton btnLoad = new JButton("Load");
 	
 	
 	int index = 0;
 
-	private int maxpoints = 1024;
-	private void notifySignal(int bitrate, float[] points) {
-		int zoom = 64;
+	private int width = 500;
+	private int resolution = 5; // ms
+	
+	private void notifySignal(int bitrate, float[] points, boolean[] upOrDown) {
+		int msZoom = resolution;
+		int zoom = (bitrate / 1000) * msZoom;
 		
 		double max = 0.0f;
-		
 		for (int i = 0; i < points.length; i++) {
 			max = Math.max(max, Math.abs(points[i]));
 			
 			if (this.index % zoom == 0) {
-				traceReal.addPoint(index - (zoom / 2), (float)(max));
+				double time = (index / (double)bitrate);
+				
+				traceReal.addPoint(time, (float)(max));
+				traceParsed.addPoint(time, upOrDown[i] ? 1.0 : 0.0);
+				
 				max = 0.0f;
 			}
 			index++;
@@ -249,19 +300,12 @@ public class MorseInputPanel extends JPanel {
 	}
 	
 	private void notifyRecordDit(int symbolIndex, int ditIndex, boolean value) {
-		statusLabel.setText("Status: recording (" + symbolIndex + ")");
+//		rightTextArea.requestFocus();
+//		rightTextArea.setCaretPosition(symbolIndex + 1);
+//		rightTextArea.setSelectionStart(symbolIndex);
+//		rightTextArea.setSelectionEnd(symbolIndex + 1);
 		
-		rightTextArea.requestFocus();
-		rightTextArea.setCaretPosition(symbolIndex + 1);
-		rightTextArea.setSelectionStart(symbolIndex);
-		rightTextArea.setSelectionEnd(symbolIndex + 1);
-		
-//		if (prev != value) {
-//			traceParsed.addPoint(ditIndex, prev ? 1 : 0);
-//		}
-//		traceParsed.addPoint(ditIndex, value ? 1 : 0);
-		
-		this.prev = value;
+		cur = value;
 	}
 	
 	private void initialize() {
@@ -273,27 +317,25 @@ public class MorseInputPanel extends JPanel {
 		labelPanel.setLayout(new MigLayout("", "0[grow]0", "0[grow]0"));
 		
 		labelPanel.add(contentPanel, "cell 0 0,grow");
-		contentPanel.setLayout(new MigLayout("", "[][][][][][grow][][]", "[][120px][grow]"));
+		contentPanel.setLayout(new MigLayout("", "[][][][][grow][][]", "[][120px][grow]"));
 		
 		contentPanel.add(btnLoad, "cell 0 0");
 		
 		contentPanel.add(recordButton, "cell 1 0");
 		contentPanel.add(stopButton, "cell 2 0");
+		contentPanel.add(statusLabel, "cell 3 0");
 		
-		contentPanel.add(btnReset, "cell 3 0");
-		contentPanel.add(statusLabel, "cell 4 0");
-		
-		contentPanel.add(speedLabel, "cell 6 0,alignx trailing");
+		contentPanel.add(speedLabel, "cell 5 0,alignx trailing");
 		speedTextField.setHorizontalAlignment(SwingConstants.TRAILING);
 		speedTextField.setColumns(10);
 		speedTextField.setDocument(new LimitedDocument("0123456789"));
 		
-		contentPanel.add(speedTextField, "cell 7 0,growx");
+		contentPanel.add(speedTextField, "cell 6 0,growx");
 		chart.setPaintLabels(false);
 		splitPane.setResizeWeight(0.5);
 		splitPane.setContinuousLayout(true);
 		
-		contentPanel.add(splitPane, "cell 0 2 8 1,grow");
+		contentPanel.add(splitPane, "cell 0 2 7 1,grow");
 		
 		splitPane.setLeftComponent(leftScrollPane);
 		leftTextArea.setWrapStyleWord(true);
