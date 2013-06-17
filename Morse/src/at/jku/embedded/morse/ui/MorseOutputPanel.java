@@ -1,5 +1,6 @@
 package at.jku.embedded.morse.ui;
 
+import java.awt.EventQueue;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -9,6 +10,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
+import java.util.concurrent.Future;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -25,9 +27,11 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import net.miginfocom.swing.MigLayout;
+import at.jku.embedded.morse.MorseCode;
 import at.jku.embedded.morse.MorseCoder;
 import at.jku.embedded.morse.MorseIn;
 import at.jku.embedded.morse.MorseOut;
+import at.jku.embedded.morse.audio.AudioOut;
 
 public class MorseOutputPanel extends JPanel {
 	
@@ -38,7 +42,7 @@ public class MorseOutputPanel extends JPanel {
 	private final JButton playButton = new JButton("Play");
 	private final JButton stopButton = new JButton("Stop");
 	private final JLabel statusLabel = new JLabel("Status: Playback...");
-	private final JLabel speedLabel = new JLabel("Playbackspeed");
+	private final JLabel speedLabel = new JLabel("Playbackspeed (ms)");
 	private final JTextField speedTextField = new JTextField();
 	private final JSplitPane splitPane = new JSplitPane();
 	private final JScrollPane leftScrollPane = new JScrollPane();
@@ -51,12 +55,35 @@ public class MorseOutputPanel extends JPanel {
 	private boolean disabledLeftEvents;
 	private boolean disabledRightEvents;
 	
+	private final AudioOut audioOut = new AudioOut() {
+		protected void notifyPlayingIndex(final int index) {
+			EventQueue.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					playedIndex(index);
+				}
+			});
+		}
+		
+		protected void notifyPlayedDone() {
+			EventQueue.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					stop();
+				}
+			});
+		};
+	};
+	
 	/**
 	 * Create the panel.
 	 */
 	public MorseOutputPanel() {
 		initialize();
 		initListeners();
+		
+		speedTextField.setText(String.valueOf(audioOut.getDitLength()));
+		setPlaying(false);
 	}
 	
 	private void initListeners() {
@@ -94,6 +121,25 @@ public class MorseOutputPanel extends JPanel {
 			}
 		});
 		
+		speedTextField.getDocument().addDocumentListener(new DocumentListener() {
+			@Override
+			public void removeUpdate(DocumentEvent e) {
+				updateDitLength();
+			}
+			
+			@Override
+			public void insertUpdate(DocumentEvent e) {
+				updateDitLength();
+			}
+			
+			@Override
+			public void changedUpdate(DocumentEvent e) {
+				updateDitLength();
+			}
+
+		
+		});
+		
 		rightLoadButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				String str = loadStringFromFile();
@@ -110,9 +156,31 @@ public class MorseOutputPanel extends JPanel {
 				}
 			}
 		});
+		
+		playButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				play();
+			}
+		});
+		
+		stopButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				stop();
+			}
+		});
 	}
 	
 	private File lastDir;
+	
+	private void updateDitLength() {
+		try {
+			int value = Integer.parseInt(speedTextField.getText());
+			audioOut.setDitLength(value);
+		} catch (NumberFormatException e) {
+		}
+	}
 	
 	private String loadStringFromFile() {
 		if (lastDir == null) {
@@ -137,6 +205,50 @@ public class MorseOutputPanel extends JPanel {
 			}
 		}
 		return null;
+	}
+	
+	private Future<?> playing;
+
+	private void play() {
+		if (playing != null) {
+			return;
+		}
+		setPlaying(true);
+		
+		playing = audioOut.play(MorseCode.fromString(rightTextArea.getText()));
+	}  
+	
+	private void stop() {
+		if (playing != null) {
+			playing.cancel(true);
+			setPlaying(false);
+			
+			playing = null;
+		}
+	}
+	
+	private void setPlaying(boolean playing) {
+		if (!playing) {
+			statusLabel.setText("Status: stopped.");
+		} else {
+			statusLabel.setText("Status: playing...");
+		}
+		
+		playButton.setEnabled(!playing);
+		stopButton.setEnabled(playing);
+		
+		leftTextArea.setEditable(!playing);
+		rightTextArea.setEditable(!playing);
+		speedTextField.setEnabled(!playing);
+	}
+	
+	private void playedIndex(int index) {
+		statusLabel.setText("Status: playing (" + index+ "/" + rightTextArea.getText().length()+")");
+		
+		rightTextArea.requestFocus();
+		rightTextArea.setCaretPosition(index + 1);
+		rightTextArea.setSelectionStart(index);
+		rightTextArea.setSelectionEnd(index + 1);
 	}
 	
 	private void updateRight() {
@@ -196,9 +308,9 @@ public class MorseOutputPanel extends JPanel {
 		contentPanel.add(statusLabel, "cell 2 0");
 		
 		contentPanel.add(speedLabel, "cell 4 0,alignx trailing");
-		speedTextField.setText("16000");
 		speedTextField.setHorizontalAlignment(SwingConstants.TRAILING);
 		speedTextField.setColumns(10);
+		speedTextField.setDocument(new LimitedDocument("0123456789"));
 		
 		contentPanel.add(speedTextField, "cell 5 0,growx");
 		splitPane.setResizeWeight(0.5);

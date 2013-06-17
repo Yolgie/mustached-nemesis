@@ -47,7 +47,7 @@ public class MorseApplication {
 		frmMorseApplication.setTitle("Morse Application");
 		frmMorseApplication.setBounds(100, 100, 543, 512);
 		frmMorseApplication.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frmMorseApplication.getContentPane().setLayout(new MigLayout("", "[grow,left]", "[grow][grow]"));
+		frmMorseApplication.getContentPane().setLayout(new MigLayout("", "[grow,left]", "[][grow]"));
 		
 		frmMorseApplication.getContentPane().add(morseOutputPanel, "cell 0 0,grow");
 		morseInput.setBorder(new TitledBorder(null, "Morse Input", TitledBorder.LEADING, TitledBorder.TOP, null, null));
