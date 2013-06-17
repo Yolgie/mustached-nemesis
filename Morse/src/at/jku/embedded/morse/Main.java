@@ -2,33 +2,38 @@ package at.jku.embedded.morse;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.nio.file.Files;
+import java.util.Arrays;
+
+import javax.sound.sampled.UnsupportedAudioFileException;
+
+import at.jku.embedded.morse.audio.BinarySignalProcessor;
+import be.hogent.tarsos.dsp.AudioDispatcher;
+import be.hogent.tarsos.dsp.AudioEvent;
+import be.hogent.tarsos.dsp.AudioProcessor;
+import be.hogent.tarsos.dsp.filters.BandPass;
+import be.hogent.tarsos.dsp.filters.HighPass;
+import be.hogent.tarsos.dsp.pitch.McLeodPitchMethod;
+import be.hogent.tarsos.dsp.pitch.PitchDetectionResult;
+import be.hogent.tarsos.dsp.pitch.PitchDetector;
 
 public class Main {
 
 	public static void main(String[] args) throws IOException {
-		MorseCoder coder = new MorseCoder();
-		final File inFile = new File("../sample2.txt");
+		File audioFile = new File("../sos.wav");
 		
-		String input = new String(Files.readAllBytes(inFile.toPath()));
-		input = input.trim();
-		
-		StringWriter w = new StringWriter();
-		System.out.println("Input:   " + input);
-		coder.decodeText(new MorseIn(new StringReader(input)), w);
-		
-		String s = w.getBuffer().toString();
-		System.out.println("Decoded: " + s);
-		
-		StringWriter w2 = new StringWriter();
-		coder.encodeText(new StringReader(s), new MorseOut(w2));
-		
-		String result = w2.getBuffer().toString().trim();
-		
-		System.out.println("Encoded: " + result);
-		System.out.println("Valid: " + input.equals(result));
+		try {
+			AudioDispatcher dispatcher = AudioDispatcher.fromFile(audioFile, 4410, 0);
+
+			final long frames = dispatcher.durationInFrames();
+			System.out.println(frames);
+			
+			dispatcher.addAudioProcessor(new BandPass(2000, 100, 44100));
+			
+			dispatcher.addAudioProcessor(new BinarySignalProcessor());
+			
+			dispatcher.run();
+		} catch (UnsupportedAudioFileException | IOException e) {
+			e.printStackTrace();
+		}
 	}
-	
 }
