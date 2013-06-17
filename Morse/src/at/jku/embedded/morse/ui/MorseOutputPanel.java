@@ -1,5 +1,10 @@
 package at.jku.embedded.morse.ui;
 
+import info.monitorenter.gui.chart.Chart2D;
+import info.monitorenter.gui.chart.ITrace2D;
+import info.monitorenter.gui.chart.traces.Trace2DLtd;
+
+import java.awt.Color;
 import java.awt.EventQueue;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
@@ -22,6 +27,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.UIManager;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -56,11 +62,11 @@ public class MorseOutputPanel extends JPanel {
 	private boolean disabledRightEvents;
 	
 	private final AudioOut audioOut = new AudioOut() {
-		protected void notifyPlayingIndex(final int index) {
+		protected void notifyPlayingIndex(final int index, final int ditIndex, final boolean value) {
 			EventQueue.invokeLater(new Runnable() {
 				@Override
 				public void run() {
-					playedIndex(index);
+					playedIndex(index, ditIndex, value);
 				}
 			});
 		}
@@ -83,6 +89,10 @@ public class MorseOutputPanel extends JPanel {
 		initListeners();
 		
 		speedTextField.setText(String.valueOf(audioOut.getDitLength()));
+		chart.setBorder(UIManager.getBorder("ScrollPane.border"));
+		chart.setUseAntialiasing(true);
+		
+		contentPanel.add(chart, "cell 0 2 6 1,grow");
 		setPlaying(false);
 	}
 	
@@ -208,19 +218,31 @@ public class MorseOutputPanel extends JPanel {
 	}
 	
 	private Future<?> playing;
+	private final Chart2D chart = new Chart2D();
+	   
+	private ITrace2D trace;
 
 	private void play() {
 		if (playing != null) {
 			return;
 		}
 		setPlaying(true);
+		if (trace != null) {
+			chart.removeTrace(trace);
+		}
+		
+		trace = new Trace2DLtd(100);
+		trace.setColor(Color.RED);
+		trace.setPhysicalUnits("Dit", "Value");
+		
+		chart.addTrace(trace);
 		
 		playing = audioOut.play(MorseCode.fromString(rightTextArea.getText()));
 	}  
 	
 	private void stop() {
 		if (playing != null) {
-			playing.cancel(true);
+			playing.cancel(false);
 			setPlaying(false);
 			
 			playing = null;
@@ -242,13 +264,23 @@ public class MorseOutputPanel extends JPanel {
 		speedTextField.setEnabled(!playing);
 	}
 	
-	private void playedIndex(int index) {
-		statusLabel.setText("Status: playing (" + index+ "/" + rightTextArea.getText().length()+")");
+	private boolean prev;
+	
+	private void playedIndex(int symbolIndex, int ditIndex, boolean value) {
+		statusLabel.setText("Status: playing (" + symbolIndex+ "/" + rightTextArea.getText().length()+")");
 		
 		rightTextArea.requestFocus();
-		rightTextArea.setCaretPosition(index + 1);
-		rightTextArea.setSelectionStart(index);
-		rightTextArea.setSelectionEnd(index + 1);
+		rightTextArea.setCaretPosition(symbolIndex + 1);
+		rightTextArea.setSelectionStart(symbolIndex);
+		rightTextArea.setSelectionEnd(symbolIndex + 1);
+		
+		if (prev != value) {
+			trace.addPoint(ditIndex, prev ? 1 : 0);
+		}
+		trace.addPoint(ditIndex, value ? 1 : 0);
+		
+		
+		this.prev = value;
 	}
 	
 	private void updateRight() {
@@ -292,19 +324,19 @@ public class MorseOutputPanel extends JPanel {
 	}
 	
 	private void initialize() {
+		chart.setPaintLabels(false);
 		setLayout(new GridLayout(0, 1, 0, 0));
+		
 		labelPanel.setBorder(new TitledBorder(null, "Morse Output", TitledBorder.LEADING, TitledBorder.TOP, null, null));
 		
 		add(labelPanel);
 		labelPanel.setLayout(new MigLayout("", "0[grow]0", "0[grow]0"));
 		
 		labelPanel.add(contentPanel, "cell 0 0,grow");
-		contentPanel.setLayout(new MigLayout("", "[][][][grow][][]", "[][grow]"));
+		contentPanel.setLayout(new MigLayout("", "[][][][grow][][]", "[][][120px]"));
 		
 		contentPanel.add(playButton, "cell 0 0");
-		
 		contentPanel.add(stopButton, "cell 1 0");
-		
 		contentPanel.add(statusLabel, "cell 2 0");
 		
 		contentPanel.add(speedLabel, "cell 4 0,alignx trailing");
@@ -320,7 +352,7 @@ public class MorseOutputPanel extends JPanel {
 		
 		splitPane.setLeftComponent(leftScrollPane);
 		leftTextArea.setWrapStyleWord(true);
-		leftTextArea.setRows(10);
+		leftTextArea.setRows(5);
 		leftTextArea.setLineWrap(true);
 		leftTextArea.setDocument(new LimitedDocument(MorseCoder.getAllowedCharacters()));
 		
@@ -331,7 +363,7 @@ public class MorseOutputPanel extends JPanel {
 		
 		splitPane.setRightComponent(rightScrollPane);
 		rightTextArea.setWrapStyleWord(true);
-		rightTextArea.setRows(10);
+		rightTextArea.setRows(5);
 		rightTextArea.setLineWrap(true);
 		rightTextArea.setDocument(new LimitedDocument("-. "));
 		

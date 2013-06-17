@@ -63,9 +63,7 @@ public class MorseCoder {
 				return m;
 			} else if (index < TREE_ARRAY.length) {
 				char result = TREE_ARRAY[index];
-				if (result == '+') {
-					w.write("ch");
-				} else if (result == '#') {
+				if (result == '#') {
 					// just filter invalid
 					throw new IllegalArgumentException("Invalid character at index " + index);
 				} else {

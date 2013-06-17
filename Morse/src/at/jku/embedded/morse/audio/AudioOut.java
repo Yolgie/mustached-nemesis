@@ -17,7 +17,7 @@ public class AudioOut {
 
 	private ExecutorService exec = Executors.newScheduledThreadPool(1);
 
-	private int ditLength = 100; // ms
+	private int ditLength = 50; // ms
 	private final int sampleRate = 16000;
 	
 	private Future<?> active;
@@ -50,24 +50,23 @@ public class AudioOut {
 		line.open(format, 4096); // open line with 4 KB buffer
 		
 		int index = 0;
+		int ditIndex = 0;
 		for (Morse morse : out.getMorses()) {
-			
-			notifyPlayingIndex(index);
 			
 			switch (morse) {
 			case DASH:
-				play(line, true);
-				play(line, true);
-				play(line, true);
-				play(line, false);
+				play(ditIndex++, index, line, true);
+				play(ditIndex++, index, line, true);
+				play(ditIndex++, index, line, true);
+				play(ditIndex++, index, line, false);
 				break;
 			case DOT:
-				play(line, true);
-				play(line, false);
+				play(ditIndex++, index, line, true);
+				play(ditIndex++, index, line, false);
 				break;
 			case GAP:
-				play(line, false);
-				play(line, false);
+				play(ditIndex++, index, line, false);
+				play(ditIndex++, index, line, false);
 				break;
 			case END:
 				break;
@@ -87,7 +86,7 @@ public class AudioOut {
 		notifyPlayedDone();
 	}
 	
-	protected void notifyPlayingIndex(int index) {
+	protected void notifyPlayingIndex(final int index, final int ditIndex, final boolean value) {
 		
 	}
 	
@@ -95,7 +94,9 @@ public class AudioOut {
 		
 	}
 	
-	private void play(SourceDataLine line, boolean enabled) {
+	private void play(int ditIndex, int symbolIndex, SourceDataLine line, boolean enabled) {
+		notifyPlayingIndex(symbolIndex, ditIndex, enabled);
+		
 		int ditLength = (sampleRate / 1000) * this.ditLength;
 		
 		for (int i = 0; i < ditLength; i++) { // play 1 sec tone (16000 samples)
