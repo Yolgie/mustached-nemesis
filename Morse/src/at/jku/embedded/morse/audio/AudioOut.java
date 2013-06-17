@@ -17,7 +17,7 @@ public class AudioOut {
 
 	private ExecutorService exec = Executors.newScheduledThreadPool(1);
 
-	private int ditLength = 50; // ms
+	private int ditLength = 250; // ms
 	
 	private Future<?> active;
 	

@@ -7,11 +7,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.LineUnavailableException;
-import javax.sound.sampled.TargetDataLine;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 import at.jku.embedded.morse.Morse;
@@ -23,12 +19,12 @@ public class AudioIn {
 
 	private ExecutorService exec = Executors.newScheduledThreadPool(1);
 
-	public static final int BITRATE = 22000;
+	public static final int BITRATE = 44100;
 	
-	public static final int FRAME_BUFFER = 1024;
+	public static final int FRAME_BUFFER = 44100 / 16;
 	public static final int FRAME_OVERLAP = 0;
 	
-	private int ditLength = 50;
+	private int ditLength = 250;
 
 	private Future<?> active;
 	
@@ -71,9 +67,19 @@ public class AudioIn {
 				notifyDone();
 			}
 
+			int floats;
+			long time = System.currentTimeMillis();
+			
 			@Override
 			public boolean process(AudioEvent audioEvent) {
 				int bitRate = (int)audioEvent.getSampleRate();
+				floats += audioEvent.getFloatBuffer().length;
+				
+				
+				System.out.println("floats" + floats +": " +(System.currentTimeMillis() - time) + "ms");
+				
+				System.out.println(audioEvent.getTimeStamp());
+				
 				notifySignalProcessed(bitRate, audioEvent.getFloatBuffer(), up);
 				return !active.isCancelled();
 			}
@@ -93,12 +99,7 @@ public class AudioIn {
 	
 	public Future<?> record() {
 		try {
-			final AudioFormat format = new AudioFormat(BITRATE, 16, 1, true,true);
-			TargetDataLine line =  AudioSystem.getTargetDataLine(format);
-			line.open(format, FRAME_BUFFER);
-			line.start();
-			AudioInputStream stream = new AudioInputStream(line);
-			return process(new AudioDispatcher(stream, FRAME_BUFFER, FRAME_OVERLAP));
+			return process(AudioDispatcher.fromDefaultMicrophone(FRAME_BUFFER, FRAME_OVERLAP));
 		} catch (UnsupportedAudioFileException | LineUnavailableException e) {
 			e.printStackTrace();
 			return null;
@@ -106,13 +107,16 @@ public class AudioIn {
 	}
 	
 	protected void notifyChangeImpl(int bitrate, long frameIndex, long durationFrames, boolean value) {
+		System.out.println(bitrate);
 		long durationMs = durationFrames / (bitrate / 1000);
+		System.out.println(durationMs);
 		this.up = value;
 		double dits = durationMs / (double)ditLength;
 		if (!value) {
 			// downwards
-			if (dits < 0.5 || dits > 3.5) {
+			if (dits < 0.5 || dits > 4.5) {
 				// error
+				System.out.println("Error down: " + dits);
 				return;
 			}
 			if (dits <= 1.5) {
@@ -128,6 +132,7 @@ public class AudioIn {
 			} else {
 				double numberSpaces = (dits - 1.0d) / 2.0d;
 				int spaces = Math.round((float) numberSpaces);
+				System.out.println(spaces);
 				for (int i = 0; i < spaces; i++) {
 					notifyMorseAdded(Morse.GAP);
 				}
