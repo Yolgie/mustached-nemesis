@@ -333,7 +333,7 @@ public class MorseOutputPanel extends JPanel {
 		labelPanel.setLayout(new MigLayout("", "0[grow]0", "0[grow]0"));
 		
 		labelPanel.add(contentPanel, "cell 0 0,grow");
-		contentPanel.setLayout(new MigLayout("", "[][][][grow][][]", "[][][120px]"));
+		contentPanel.setLayout(new MigLayout("", "[][][][grow][][]", "[][grow][120px]"));
 		
 		contentPanel.add(playButton, "cell 0 0");
 		contentPanel.add(stopButton, "cell 1 0");

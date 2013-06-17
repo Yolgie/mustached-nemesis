@@ -81,7 +81,7 @@ public class AudioOut {
 		
 		line.drain();
 		line.close(); // close line
-		
+
 		active = null;
 		notifyPlayedDone();
 	}
