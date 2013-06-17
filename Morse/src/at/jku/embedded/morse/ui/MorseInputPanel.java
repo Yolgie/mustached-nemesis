@@ -4,9 +4,11 @@ import info.monitorenter.gui.chart.Chart2D;
 import info.monitorenter.gui.chart.ITrace2D;
 import info.monitorenter.gui.chart.traces.Trace2DLtd;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.EventQueue;
 import java.awt.GridLayout;
+import java.awt.Stroke;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
@@ -82,7 +84,6 @@ public class MorseInputPanel extends JPanel {
 		
 		speedTextField.setText(String.valueOf(audioIn.getDitLength()));
 		chart.setBorder(UIManager.getBorder("ScrollPane.border"));
-		chart.setUseAntialiasing(true);
 		
 		contentPanel.add(chart, "cell 0 1 8 1,grow");
 		setPlaying(false);
@@ -170,11 +171,12 @@ public class MorseInputPanel extends JPanel {
 			chart.removeTrace(traceParsed);
 		}
 		
-		traceReal = new Trace2DLtd(100);
+		traceReal = new Trace2DLtd(3000);
 		traceReal.setColor(Color.BLUE);
 		traceReal.setPhysicalUnits("Dit", "Value");
+		traceReal.setStroke(new BasicStroke(0.05f));
 		
-		traceParsed = new Trace2DLtd();
+		traceParsed = new Trace2DLtd(100);
 		traceParsed.setColor(Color.RED);
 		traceParsed.setPhysicalUnits("Dit", "Value");
 		
@@ -216,7 +218,8 @@ public class MorseInputPanel extends JPanel {
 	int index = 0;
 	private void notifySignal(float[] points) {
 		for (float f : points) {
-			traceReal.addPoint(index++, f);
+			traceReal.addPoint(index, f);
+			index++;
 		}
 	}
 	

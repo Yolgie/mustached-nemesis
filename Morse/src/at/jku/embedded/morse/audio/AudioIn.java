@@ -1,13 +1,14 @@
 package at.jku.embedded.morse.audio;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineEvent;
@@ -23,6 +24,8 @@ import be.hogent.tarsos.dsp.filters.HighPass;
 
 public class AudioIn {
 
+	private ExecutorService exec = Executors.newScheduledThreadPool(1);
+
 	private int ditLength = 50;
 
 	public int getDitLength() {
@@ -32,44 +35,55 @@ public class AudioIn {
 	public void setDitLength(int ditLength) {
 		this.ditLength = ditLength;
 	}
-	
-	public void load(File file) {
-	
-		try {
-			AudioDispatcher dispatcher = AudioDispatcher.fromFile(file, 1000, 0);
 
-			final long frames = dispatcher.durationInFrames();
-			System.out.println(frames);
-			
-			dispatcher.addAudioProcessor(new HighPass(120, 16000));
-			
-			dispatcher.addAudioProcessor(new AudioProcessor() {
-				@Override
-				public void processingFinished() {
-				}
-				
-				float frame;
-				
-				@Override
-				public boolean process(AudioEvent audioEvent) {
-					int sampleRate = (int) audioEvent.getSampleRate();
-					System.out.println(Arrays.toString(audioEvent.getFloatBuffer()));
-					
-					notifySignalProcessed(audioEvent.getFloatBuffer());
-					return true;
-				}
-			});
-			
-			dispatcher.run();
+	public Future<?> load(File file) {
+		try {
+			return process(AudioDispatcher.fromFile(file, 1000, 0));
 		} catch (UnsupportedAudioFileException | IOException e) {
 			e.printStackTrace();
+			return null;
 		}
-		
-		
+	}
+
+	private Future<?> process(final AudioDispatcher dispatcher) {
+		return exec.submit(new Callable<Void>() {
+			@Override
+			public Void call() throws Exception {
+				processImpl(dispatcher);
+				return null;
+			}
+		});
+	}
+
+	private void processImpl(AudioDispatcher dispatcher) {
+		final long frames = dispatcher.durationInFrames();
+		System.out.println(frames);
+
+		dispatcher.addAudioProcessor(new AudioProcessor() {
+			@Override
+			public void processingFinished() {
+			}
+
+			float frame;
+
+			@Override
+			public boolean process(AudioEvent audioEvent) {
+				int sampleRate = (int) audioEvent.getSampleRate();
+				System.out.println(Arrays.toString(audioEvent.getFloatBuffer()));
+
+				notifySignalProcessed(audioEvent.getFloatBuffer());
+				return true;
+			}
+		});
 	}
 
 	public Future<?> record() {
-		return null;
+		try {
+			return process(AudioDispatcher.fromDefaultMicrophone(1000, 0));
+		} catch (UnsupportedAudioFileException | LineUnavailableException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 
 	protected void notifyDitReceived(int ditIndex, int symbolIndex,
@@ -107,11 +121,11 @@ public class AudioIn {
 			Thread.sleep(1000);
 
 			line.stop();
-			
+
 			int available = line.available();
 			byte[] buffer = new byte[available];
 			line.read(buffer, 0, available);
-			
+
 			System.out.println(Arrays.toString(buffer));
 
 		} catch (LineUnavailableException ex) {
