@@ -9,6 +9,7 @@ import java.awt.EventQueue;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
@@ -55,8 +56,12 @@ public class MorseOutputPanel extends JPanel {
 	private final JScrollPane rightScrollPane = new JScrollPane();
 	private final JTextArea leftTextArea = new JTextArea();
 	private final JTextArea rightTextArea = new JTextArea();
+	private final JPanel leftButtonPane = new JPanel();
 	private final JButton leftLoadButton = new JButton("Load from File...");
+	private final JButton leftSaveButton = new JButton("Save to File...");
+	private final JPanel rightButtonPane = new JPanel();
 	private final JButton rightLoadButton = new JButton("Load from File...");
+	private final JButton rightSaveButton = new JButton("Save to File...");
 
 	private boolean disabledLeftEvents;
 	private boolean disabledRightEvents;
@@ -166,7 +171,18 @@ public class MorseOutputPanel extends JPanel {
 				}
 			}
 		});
-		
+
+		rightSaveButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				saveStringToFile(rightTextArea.getText());
+			}
+		});
+		leftSaveButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				saveStringToFile(leftTextArea.getText());
+			}
+		});
+
 		playButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -215,6 +231,27 @@ public class MorseOutputPanel extends JPanel {
 			}
 		}
 		return null;
+	}
+	
+	private void saveStringToFile(String string) {
+		if (lastDir == null) {
+			lastDir = new File("./");
+		}
+		JFileChooser chooser = new JFileChooser(lastDir);
+		
+		int result = chooser.showSaveDialog(this);
+		if (result == JFileChooser.APPROVE_OPTION) {
+			File file = chooser.getSelectedFile();
+			if (file != null) {
+				try {
+					BufferedWriter writer = Files.newBufferedWriter(file.toPath(), Charset.defaultCharset());
+					writer.write(string);
+					writer.close();
+				} catch (IOException e) {
+					JOptionPane.showConfirmDialog(this, "Error saving. " + e.toString(), "Error", JOptionPane.OK_OPTION, JOptionPane.ERROR_MESSAGE);
+				}
+			}
+		}
 	}
 	
 	private Future<?> playing;
@@ -358,8 +395,10 @@ public class MorseOutputPanel extends JPanel {
 		
 		leftScrollPane.setViewportView(leftTextArea);
 
-		
-		leftScrollPane.setColumnHeaderView(leftLoadButton);
+		leftButtonPane.setLayout(new GridLayout(1,0));
+		leftButtonPane.add(leftLoadButton);
+		leftButtonPane.add(leftSaveButton);
+		leftScrollPane.setColumnHeaderView(leftButtonPane);
 		
 		splitPane.setRightComponent(rightScrollPane);
 		rightTextArea.setWrapStyleWord(true);
@@ -369,7 +408,10 @@ public class MorseOutputPanel extends JPanel {
 		
 		rightScrollPane.setViewportView(rightTextArea);
 		
-		rightScrollPane.setColumnHeaderView(rightLoadButton);
+		rightButtonPane.setLayout(new GridLayout(1,0));
+		rightButtonPane.add(rightLoadButton);
+		rightButtonPane.add(rightSaveButton);
+		rightScrollPane.setColumnHeaderView(rightButtonPane);
 	}
 
 }
