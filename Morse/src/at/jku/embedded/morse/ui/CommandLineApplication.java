@@ -39,7 +39,7 @@ public class CommandLineApplication {
 				
 				if (cmd.hasOption('e')) {
 					String input = readStringFromFile(cmd.getOptionValue('e')).toUpperCase().replaceAll("[^" + MorseCoder.getAllowedCharacters() + "]+","");
-					System.out.println(input);
+					//System.out.println(input);
 					if (input != null) {
 						MorseCoder coder = new MorseCoder();
 						StringWriter w = new StringWriter();
@@ -53,7 +53,7 @@ public class CommandLineApplication {
 					}
 				} else if (cmd.hasOption('d')){
 					String input = readStringFromFile(cmd.getOptionValue('d')).replaceAll("[^-. ]+","");
-					System.out.println(input);
+					//System.out.println(input);
 					if (input != null) {
 						MorseCoder coder = new MorseCoder();
 						StringWriter w = new StringWriter();

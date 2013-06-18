@@ -14,6 +14,9 @@ import at.jku.embedded.morse.Morse;
 import be.hogent.tarsos.dsp.AudioDispatcher;
 import be.hogent.tarsos.dsp.AudioEvent;
 import be.hogent.tarsos.dsp.AudioProcessor;
+import be.hogent.tarsos.dsp.filters.BandPass;
+import be.hogent.tarsos.dsp.filters.HighPass;
+import be.hogent.tarsos.dsp.filters.LowPassFS;
 
 public class AudioIn {
 
@@ -53,6 +56,9 @@ public class AudioIn {
 		final long frames = dispatcher.durationInFrames();
 		System.out.println(frames);
 
+		//dispatcher.addAudioProcessor(new HighPass(1800, BITRATE));
+		//dispatcher.addAudioProcessor(new LowPassFS(2200, BITRATE));
+		
 		dispatcher.addAudioProcessor(new BinarySignalProcessor() {
 			@Override
 			protected void notifyChange(long frameIndex, boolean up,
