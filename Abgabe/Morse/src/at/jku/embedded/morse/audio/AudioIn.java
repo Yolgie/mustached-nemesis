@@ -122,7 +122,7 @@ public class AudioIn {
 				System.out.println("Error down: " + dits);
 				return;
 			}
-			if (dits <= 2.0) {
+			if (dits <= 1.5) {
 				// single dit
 				notifyMorseAdded(Morse.DOT);
 			} else {

@@ -1,7 +1,5 @@
 package at.jku.embedded.morse.audio;
 
-import java.util.Arrays;
-
 import be.hogent.tarsos.dsp.AudioEvent;
 import be.hogent.tarsos.dsp.AudioProcessor;
 

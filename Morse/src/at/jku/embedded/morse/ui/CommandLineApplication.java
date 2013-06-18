@@ -8,7 +8,13 @@ import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 
-import org.apache.commons.cli.*;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 
 import at.jku.embedded.morse.MorseCoder;
 import at.jku.embedded.morse.MorseIn;
@@ -18,6 +24,7 @@ import at.jku.embedded.morse.MorseOut;
 
 public class CommandLineApplication {
 
+	@SuppressWarnings("static-access")
 	public static void main(String[] args) {
 		Options options = new Options();
 		options.addOption("h", false, "print this message");
